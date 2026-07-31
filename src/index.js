@@ -16,9 +16,19 @@ const corsOptions = {
   ],
   methods: ["GET", "POST", "OPTIONS"],
 };
-const resizer = ({ rotate, left, top, width, height, maxWidth, logo }) => {
-  console.log(rotate, left, top, width, height, maxWidth);
-  return sharp()
+
+const resizer = ({
+  rotate,
+  left,
+  top,
+  width,
+  height,
+  maxDimension,
+  noLogo,
+  logo,
+}) => {
+  // console.log(rotate, left, top, width, height, maxWidth);
+  const image = sharp()
     .rotate(rotate)
     .extract({
       left,
@@ -26,26 +36,45 @@ const resizer = ({ rotate, left, top, width, height, maxWidth, logo }) => {
       width,
       height,
     })
-    .resize({ width: maxWidth })
-    .composite([
+    .resize({
+      width: maxDimension,
+      height: maxDimension,
+      fit: "inside",
+    });
+
+  if (!noLogo) {
+    image.composite([
       {
         input: logo,
-        top: Math.round((maxWidth / width) * height - 78),
+        top: Math.round(
+          Math.min(maxDimension / width, maxDimension / height, 1) * height - 78,
+        ),
         left: 20,
       },
-    ])
-    .extend({
-      top: 10,
-      bottom: 10,
-      left: 10,
-      right: 10,
-      background: { r: 0, g: 52, b: 77, alpha: 1 },
-    })
-    .jpeg({
-      mozjpeg: true,
-      quality: 80,
-    })
-    .on("error", (e) => console.log(e));
+    ]);
+
+    image
+      .extend({
+        top: 10,
+        bottom: 10,
+        left: 10,
+        right: 10,
+        background: { r: 0, g: 52, b: 77, alpha: 1 },
+      })
+      .jpeg({
+        mozjpeg: true,
+        quality: 80,
+      });
+  } else {
+    image
+      .flatten({ background: { r: 255, g: 255, b: 255, alpha: 1 } })
+      .jpeg({
+        mozjpeg: true,
+        quality: 80,
+      });
+  }
+
+  return image.on("error", (e) => console.log(e));
 };
 
 (async () => {
@@ -59,7 +88,7 @@ const resizer = ({ rotate, left, top, width, height, maxWidth, logo }) => {
   });
   app.post("/", cors(corsOptions), (req, res) => {
     const busboy = new Busboy({ headers: req.headers });
-    const { rotate, left, top, width, height, maxWidth } = req.query;
+    const { rotate, left, top, width, height, maxDimension, noLogo } = req.query;
     busboy.on("file", (_, file) => {
       try {
         file.on("data", () => null);
@@ -71,9 +100,10 @@ const resizer = ({ rotate, left, top, width, height, maxWidth, logo }) => {
               top: Number(top),
               width: Number(width),
               height: Number(height),
-              maxWidth: Number(maxWidth),
+              maxDimension: Number(maxDimension),
+              noLogo: noLogo === "true",
               logo,
-            })
+            }),
           )
           .pipe(res);
       } catch (error) {
