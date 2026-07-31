@@ -90,3 +90,4 @@ const resizer = ({ rotate, left, top, width, height, maxWidth, logo }) => {
     console.log(`Example app listening at http://localhost:${port}`);
   });
 })();
+// edit to trigger build
